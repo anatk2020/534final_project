@@ -1,0 +1,425 @@
+---
+title: "choosing_thresholds"
+author: "Ann Cirincione"
+date: "5/4/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Finding thresholds that have the same FPR/FNR
+
+```{r, message=FALSE}
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+# Function that calculates FPR and FNR at different thresholds
+get_threshold_df <- function(df, threshold, attr, output_df){
+  threshold_df <- ungroup(df) %>%
+    mutate(received_h1n1 = case_when(h1n1_pred >= threshold ~ 1, h1n1_pred < threshold ~ 0),
+           received_seasonal = case_when(seasonal_pred >= threshold ~ 1, seasonal_pred < threshold ~ 0))
+  tp_h1n1 <- nrow(filter(threshold_df, received_h1n1==1 & h1n1_vaccine == 1))
+  fp_h1n1 <- nrow(filter(threshold_df, received_h1n1==1 & h1n1_vaccine == 0))
+  tn_h1n1 <- nrow(filter(threshold_df, received_h1n1==0 & h1n1_vaccine == 0))
+  fn_h1n1 <- nrow(filter(threshold_df, received_h1n1==0 & h1n1_vaccine == 1))
+  
+  tp_seasonal <- nrow(filter(threshold_df, received_seasonal==1 & seasonal_vaccine == 1))
+  fp_seasonal <- nrow(filter(threshold_df, received_seasonal==1 & seasonal_vaccine == 0))
+  tn_seasonal <- nrow(filter(threshold_df, received_seasonal==0 & seasonal_vaccine == 0))
+  fn_seasonal <- nrow(filter(threshold_df, received_seasonal==0 & seasonal_vaccine == 1))
+
+  output_df[nrow(output_df)+1,] <- c(threshold, attr, "h1n1", 
+                                     (fp_h1n1/(fp_h1n1+tn_h1n1)),
+                                     (fn_h1n1/(fn_h1n1+tp_h1n1)),
+                                     (tp_h1n1/(tp_h1n1+fp_h1n1)))
+  output_df[nrow(output_df)+1,] <- c(threshold, attr, "seasonal", 
+                                     (fp_seasonal/(fp_seasonal+tn_seasonal)),
+                                     (fn_seasonal/(fn_seasonal+tp_seasonal)),
+                                     (tp_seasonal/(tp_seasonal+fp_seasonal)))
+  
+  return(output_df)
+}
+
+log_reg_predictions <- read.csv("C:/Users/ANN/PycharmProjects/COS534/Final_Project/log_reg_predictions.csv") %>%
+  rename(h1n1_pred=h1n1_vaccine.1, seasonal_pred=seasonal_vaccine.1)
+```
+
+
+## Creating threshold dataframes
+
+```{r, message=FALSE}
+# Getting values for varying thresholds for race, sex, and age group
+B_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+W_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+H_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+X_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+
+M_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+F_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+
+A1_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+A2_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+A3_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+A4_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+A5_threshold <- data.frame(threshold=numeric(), attr=character(), vaccine=character(),
+                          FPR=numeric(), FNR=numeric(), PPV=numeric())
+```
+
+## Calculating thresholds
+
+```{r, message=FALSE}
+for(i in seq(0.1, 0.9, 0.1)){
+  B_threshold <- get_threshold_df(filter(log_reg_predictions, race == "Black"), i,
+                                  "Black", B_threshold)
+  W_threshold <- get_threshold_df(filter(log_reg_predictions, race == "White"), i, 
+                                  "White", W_threshold)
+  H_threshold <- get_threshold_df(filter(log_reg_predictions, race == "Hispanic"), i, 
+                                  "Hispanic", H_threshold)
+  X_threshold <- get_threshold_df(filter(log_reg_predictions, race == "Other or Multiple"), i, 
+                                  "Other or Multiple", X_threshold)
+  
+  M_threshold <- get_threshold_df(filter(log_reg_predictions, sex == "Male"), i,
+                                  "Male", M_threshold)
+  F_threshold <- get_threshold_df(filter(log_reg_predictions, sex == "Female"), i, 
+                                  "Female", F_threshold)
+  
+  A1_threshold <- get_threshold_df(filter(log_reg_predictions, age_group == "18 - 34 Years"), i,
+                                  "18 - 34 Years", A1_threshold)
+  A2_threshold <- get_threshold_df(filter(log_reg_predictions, age_group == "35 - 44 Years"), i, 
+                                  "35 - 44 Years", A2_threshold)
+  A3_threshold <- get_threshold_df(filter(log_reg_predictions, age_group == "45 - 54 Years"), i, 
+                                  "45 - 54 Years", A3_threshold)
+  A4_threshold <- get_threshold_df(filter(log_reg_predictions, age_group == "55 - 64 Years"), i,
+                                  "55 - 64 Years", A4_threshold)
+  A5_threshold <- get_threshold_df(filter(log_reg_predictions, age_group == "65+ Years"), i, 
+                                  "65+ Years", A5_threshold)
+}
+
+merged_thresholds <- rbind.data.frame(B_threshold, W_threshold, H_threshold, X_threshold,
+                                      M_threshold, F_threshold,
+                                      A1_threshold, A2_threshold, A3_threshold, A4_threshold,
+                                      A5_threshold, stringsAsFactors = FALSE) %>%
+  mutate(threshold=as.numeric(threshold), FPR=as.numeric(FPR), FNR=as.numeric(FNR), PPV=as.numeric(PPV))
+```
+
+## Plotting for race
+
+```{r, message=FALSE}
+ggplot(data = filter(merged_thresholds, attr %in% unique(log_reg_predictions$race)) %>%
+         select(-PPV) %>%
+         melt(id.vars=c("threshold", "attr", "vaccine")) %>%
+         unite("condition", c(attr, variable), sep=" ") %>%
+         mutate(threshold=as.numeric(threshold), value=as.numeric(value))) +
+  geom_line(aes(x=threshold, y=value, color=condition)) +
+  facet_wrap(~vaccine) +
+  scale_x_continuous(breaks=seq(0.1, 0.9, 0.1)) +
+  labs(x="Threshold", y="Rate", color="") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom") 
+```
+
+## Choosing thresholds for H1N1 vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Black H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Black" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Black" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Black" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for White H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="White" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="White" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="White" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Hispanic H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="Hispanic" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Hispanic" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Hispanic" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Other/Multiple H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Other or Multiple" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Other or Multiple" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Other or Multiple" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Black H1N1 vaccine: FPR=0.076, FNR=0.561, PPV=0.478  
+At a threshold of 0.5, for White H1N1 vaccine: FPR=0.056, FNR=0.559, PPV=0.687  
+At a threshold of 0.5, for Hispanic H1N1 vaccine: FPR=0.081, FNR=0.604, PPV=0.602  
+At a threshold of 0.4, for Other/Multiple H1N1 vaccine: FPR=0.061, FNR=0.586, PPV=0.639  
+
+## Choosing thresholds for seasonal vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Black seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Black" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Black" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Black" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for White seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="White" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="White" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="White" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Hispanic seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Hispanic" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Hispanic" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Hispanic" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Other/Multiple seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Other or Multiple" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Other or Multiple" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Other or Multiple" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Black seasonal vaccine: FPR=0.272, FNR=0.227, PPV=0.624  
+At a threshold of 0.4, for White seasonal vaccine: FPR=0.288, FNR=0.188, PPV=0.727  
+At a threshold of 0.4, for Hispanic seasonal vaccine: FPR=0.27, FNR=0.347, PPV=0.597  
+At a threshold of 0.4, for Other/Multiple seasonal vaccine: FPR=0.273, FNR=0.317, PPV=0.64  
+
+## Plotting based on sex
+
+```{r, message=FALSE}
+ggplot(data = filter(merged_thresholds, attr %in% unique(log_reg_predictions$sex)) %>%
+         select(-PPV) %>%
+         melt(id.vars=c("threshold", "attr", "vaccine")) %>%
+         unite("condition", c(attr, variable), sep=" ") %>%
+         mutate(threshold=as.numeric(threshold), value=as.numeric(value))) +
+  geom_line(aes(x=threshold, y=value, color=condition)) +
+  facet_wrap(~vaccine) +
+  scale_x_continuous(breaks=seq(0.1, 0.9, 0.1)) +
+  labs(x="Threshold", y="Rate", color="") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom") 
+```
+
+## Choosing thresholds for H1N1 vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Male H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Male" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Male" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Male" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Female H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="Female" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Female" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Female" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Male H1N1 vaccine: FPR=0.077, FNR=0.543, PPV=0.6  
+At a threshold of 0.5, for Female H1N1 vaccine: FPR=0.063, FNR=0.524, PPV=0.682  
+
+## Choosing thresholds for seasonal vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Male seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="Male" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Male" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="Male" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Female seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="Female" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Female" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="Female" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Male seasonal vaccine: FPR=0.261, FNR=0.257, PPV=0.678  
+At a threshold of 0.5, for Female seasonal vaccine: FPR=0.213, FNR=0.256, PPV=0.772  
+
+## Plotting based on age group
+
+```{r, message=FALSE}
+ggplot(data = filter(merged_thresholds, attr %in% unique(log_reg_predictions$age_group)) %>%
+         select(-PPV) %>%
+         melt(id.vars=c("threshold", "attr", "vaccine")) %>%
+         unite("condition", c(attr, variable), sep=" ") %>%
+         mutate(threshold=as.numeric(threshold), value=as.numeric(value))) +
+  geom_line(aes(x=threshold, y=value, color=condition)) +
+  facet_wrap(~vaccine) +
+  #geom_vline(xintercept = 5, color="gray") +
+  #geom_vline(xintercept = 7, color="gray", linetype="dashed") +
+  scale_x_continuous(breaks=seq(0.1, 0.9, 0.1)) +
+  labs(x="Threshold", y="Rate", color="") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom") 
+```
+
+## Choosing thresholds for H1N1 vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Age 18-34 H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="18 - 34 Years" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="18 - 34 Years" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="18 - 34 Years" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Age 35-44 H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="35 - 44 Years" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="35 - 44 Years" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="35 - 44 Years" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Age 45-54 H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="45 - 54 Years" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="45 - 54 Years" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="45 - 54 Years" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Age 55-64 H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="55 - 64 Years" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="55 - 64 Years" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="55 - 64 Years" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Age 65+ H1N1 vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="65+ Years" & vaccine=="h1n1")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="65+ Years" & vaccine=="h1n1")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="65+ Years" & vaccine=="h1n1")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Age 18-34 H1N1 vaccine: FPR=0.093, FNR=0.515, PPV=0.555  
+At a threshold of 0.4, for Age 35-44 H1N1 vaccine: FPR=0.089, FNR=0.448, PPV=0.602  
+At a threshold of 0.5, for Age 45-54 H1N1 vaccine: FPR=0.056, FNR=0.487, PPV=0.672  
+At a threshold of 0.5, for Age 55-64 H1N1 vaccine: FPR=0.067, FNR=0.55, PPV=0.675  
+At a threshold of 0.4, for Age 65+ H1N1 vaccine: FPR=0.068, FNR=0.507, PPV=0.695  
+
+## Choosing thresholds for H1N1 vaccine
+
+```{r, message=FALSE}
+print(paste("At a threshold of 0.4, for Age 18-34 seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="18 - 34 Years" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="18 - 34 Years" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="18 - 34 Years" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.4, for Age 35-44 seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.4 & attr=="35 - 44 Years" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="35 - 44 Years" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.4 & attr=="35 - 44 Years" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Age 45-54 seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="45 - 54 Years" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="45 - 54 Years" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="45 - 54 Years" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Age 55-64 seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="55 - 64 Years" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="55 - 64 Years" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="55 - 64 Years" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+print(paste("At a threshold of 0.5, for Age 65+ seasonal vaccine: FPR=",
+            round(filter(merged_thresholds, 
+                         threshold==0.5 & attr=="65+ Years" & vaccine=="seasonal")$FPR, digits=3),
+            ", FNR=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="65+ Years" & vaccine=="seasonal")$FNR, digits=3),
+            ", PPV=", round(filter(merged_thresholds, 
+                                   threshold==0.5 & attr=="65+ Years" & vaccine=="seasonal")$PPV, digits=3), 
+            sep = ""))
+```
+
+At a threshold of 0.4, for Age 18-34 seasonal vaccine: FPR=0.277, FNR=0.326, PPV=0.487  
+At a threshold of 0.4, for Age 35-44 seasonal vaccine: FPR=0.232, FNR=0.289, PPV=0.643  
+At a threshold of 0.5, for Age 45-54 seasonal vaccine: FPR=0.184, FNR=0.288, PPV=0.717  
+At a threshold of 0.5, for Age 55-64 seasonal vaccine: FPR=0.222, FNR=0.233, PPV=0.794  
+At a threshold of 0.5, for Age 65+ seasonal vaccine: FPR=0.243, FNR=0.254, PPV=0.857  
+
+```{r, message=FALSE}
+# Function to calculate distance?
+library(foreach)
+euc.dist <- function(x1, x2) sqrt(sum((x1 - x2) ^ 2))
+
+best_threshold <- function(df, attribute, attribute2){
+  attr_fpr <- filter(df, attr==attribute, vaccine=="h1n1")$FPR
+  attr_fnr <- filter(df, attr==attribute, vaccine=="h1n1")$FNR
+  dist_mat <- matrix(ncol=9, nrow=9)
+  
+  for(i in 1:9){
+    x1 <- matrix(rep(c(attr_fpr[i],attr_fnr[i]), 9), nrow = 9, ncol=2, byrow=TRUE)
+    x2 <- matrix(c(filter(df, attr==attribute2, vaccine=="h1n1")$FPR, 
+                 filter(df, attr==attribute2, vaccine=="h1n1")$FNR), nrow = 9, ncol=2, byrow=FALSE)
+    
+    dist <- foreach(j = 1:nrow(x1), .combine = c ) %do% euc.dist(x1[j,],x2[j,])
+    dist_mat[i,] <- dist
+  }
+}
+
+```
