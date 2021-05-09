@@ -1,0 +1,80 @@
+---
+title: "finalproject"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(rstatix)
+library(ggpubr)
+library(caret)
+library(xtable)
+library(kableExtra)
+library(knitr)
+library(lemon)
+library(Hmisc)
+
+```
+
+```{r}
+x_train <- read.csv("./fludata/training_set_features.csv")
+y_train <- read.csv("./fludata/training_set_labels.csv")
+x_test <- read.csv("./fludata/test_set_features.csv")
+```
+
+```{r include=FALSE}
+source("theme_fivethirtyeight.R")
+get_theme <- function(size=12) {
+  
+theme_fivethirtyeight() + theme(
+  text = element_text(size=size),
+  plot.title = element_text(face = "bold", size = size),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 1),
+    legend.position = c(0.5, 1),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1))
+}
+```
+
+```{r}
+shift_legend2 <- function(p) {
+  # ...
+  # to grob
+  gp <- ggplotGrob(p)
+  facet.panels <- grep("^panel", gp[["layout"]][["name"]])
+  empty.facet.panels <- sapply(facet.panels, function(i) "zeroGrob" %in% class(gp[["grobs"]][[i]]))
+  empty.facet.panels <- facet.panels[empty.facet.panels]
+
+  # establish name of empty panels
+  empty.facet.panels <- gp[["layout"]][empty.facet.panels, ]
+  names <- empty.facet.panels$name
+  # example of names:
+  #[1] "panel-3-2" "panel-3-3"
+
+# now we just need a simple call to reposition the legend
+  reposition_legend(p, 'center', panel=names)
+}
+
+```
+
+```{r}
+summary <- tab %>% select(outcome, sensitive_attr, weighted.avg.precision, weighted.avg.recall, weighted.avg.f1.score) %>% arrange(model, outcome)
+summary
+```
+
+```{r fig.width=24, fig.height=18}
+results <- read.csv("./results/bias_results.csv")
+#tab <- results %>% group_by(sensitive_attr, outcome) %>% dplyr::summarise(Mean = mean(accuracy), sd = sd(accuracy)) %>% arrange(outcome)
+tab <- results %>% group_by(model, sensitive_attr, outcome, .drop=FALSE) %>% summarise_at(vars(-cv_index), mean)
+#knitr::kable(tab, booktabs=TRUE) %>% pack_rows(index)
+p1 <- ggplot(tab, aes(x=factor(sensitive_attr, level = c('none', 'age_group', 'income_poverty', "marital_status", "race", "sex")), y = accuracy, color=model, group=model)) + geom_point() + geom_line(position=position_dodge(width=0.2))+ facet_wrap(model~outcome, nrow = 3, strip.position = "bottom") + get_theme(18) +  theme(legend.text=element_text(size=36), legend.key.size = unit(3,"line")) +  ggtitle("Drop in accuracy after orthogonal projection")+
+  xlab("Dropped sensitive attribute") +
+  ylab("accuracy") +
+  get_theme(24)
+shift_legend2(p1)
+  #print(xtable(tab, type = "latex", digits=c(0, 0,0, 3, 3)))
+```
+
